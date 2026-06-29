@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Выбор сечения кабеля по нагреву — ПУЭ Гл.1.3</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#f0f2f5;color:#1a1a2e;line-height:1.5}
+.container{max-width:960px;margin:0 auto;padding:20px}
+h1{text-align:center;font-size:1.6rem;margin:20px 0 6px;color:#16213e}
+.subtitle{text-align:center;color:#666;font-size:.9rem;margin-bottom:24px}
+.card{background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08);padding:24px;margin-bottom:20px}
+.card h2{font-size:1.15rem;margin-bottom:16px;color:#0f3460;border-bottom:2px solid #e8eaf0;padding-bottom:8px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:600px){.grid{grid-template-columns:1fr}}
+label{display:block;font-weight:600;font-size:.85rem;margin-bottom:4px;color:#333}
+input,select{width:100%;padding:10px 12px;border:1.5px solid #d0d5dd;border-radius:8px;font-size:.95rem;transition:border .2s}
+input:focus,select:focus{outline:none;border-color:#4361ee;box-shadow:0 0 0 3px rgba(67,97,238,.15)}
+.hint{font-size:.75rem;color:#888;margin-top:2px}
+.btn{display:block;width:100%;padding:14px;background:#4361ee;color:#fff;font-size:1.05rem;font-weight:700;border:none;border-radius:10px;cursor:pointer;margin-top:18px;transition:background .2s}
+.btn:hover{background:#3a56d4}
+.result{margin-top:20px;display:none}
+.result.show{display:block}
+.result-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:14px}
+.result-item{background:#f8f9fc;border-radius:8px;padding:14px;border-left:4px solid #4361ee}
+.result-item.warn{border-left-color:#e74c3c;background:#fef5f5}
+.result-item.ok{border-left-color:#27ae60;background:#f0faf4}
+.result-item .label{font-size:.78rem;color:#666;text-transform:uppercase;letter-spacing:.5px}
+.result-item .value{font-size:1.3rem;font-weight:700;color:#16213e}
+.result-item .value.warn-text{color:#e74c3c}
+.result-item .value.ok-text{color:#27ae60}
+.steps{background:#f8f9fc;border-radius:8px;padding:16px;font-size:.88rem;line-height:1.7}
+.steps .step{margin-bottom:6px;padding-left:20px;position:relative}
+.steps .step::before{content:'';position:absolute;left:0;top:8px;width:8px;height:8px;border-radius:50%;background:#4361ee}
+.steps .step.fail::before{background:#e74c3c}
+.steps .step.pass::before{background:#27ae60}
+.table-wrap{overflow-x:auto;margin-top:10px}
+table{border-collapse:collapse;width:100%;font-size:.82rem}
+th,td{border:1px solid #dde;padding:6px 10px;text-align:center}
+th{background:#f0f2f5;font-weight:600;color:#333}
+tr:hover{background:#f8f9fc}
+.ref{font-size:.78rem;color:#888;margin-top:10px}
+.ground-only{display:none}
+.ground-only.show{display:block}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Выбор сечения кабеля по нагреву</h1>
+<p class="subtitle">ПУЭ 7 изд., Гл.1.3 · ГОСТ Р 50345-2010 · ГОСТ 31996-2012</p>
+
+<div class="card">
+<h2>Исходные данные</h2>
+<div class="grid">
+  <div>
+    <label for="voltage">Напряжение, В</label>
+    <input type="number" id="voltage" value="380" min="12" max="35000">
+  </div>
+  <div>
+    <label for="current">Номинальный ток I<sub>н</sub>, А</label>
+    <input type="number" id="current" placeholder="напр. 28" step="0.1">
+    <span class="hint">или введите мощность ниже</span>
+  </div>
+  <div>
+    <label for="power">Мощность P, кВт</label>
+    <input type="number" id="power" placeholder="напр. 15" step="0.1">
+    <span class="hint">если ввели ток — поле игнорируется</span>
+  </div>
+  <div>
+    <label for="cosfi">cos φ</label>
+    <input type="number" id="cosfi" value="0.85" step="0.01" min="0.01" max="1">
+  </div>
+  <div>
+    <label for="ki">Коэф. использования K<sub>и</sub></label>
+    <input type="number" id="ki" value="0.8" step="0.01" min="0.1" max="1">
+    <span class="hint">I<sub>р</sub> = I<sub>н</sub> × K<sub>и</sub></span>
+  </div>
+  <div>
+    <label for="material">Материал жилы</label>
+    <select id="material">
+      <option value="cu">Медь</option>
+      <option value="al">Алюминий</option>
+    </select>
+  </div>
+  <div>
+    <label for="insulation">Изоляция жилы</label>
+    <select id="insulation">
+      <option value="pvc">ПВХ (t=70°C)</option>
+      <option value="rubber">Резина (t=65°C)</option>
+      <option value="xlpe">XLPE (t=90°C)</option>
+    </select>
+  </div>
+  <div>
+    <label for="numCores">Число жил</label>
+    <select id="numCores">
+      <option value="1">1 жила</option>
+      <option value="2">2 жилы</option>
+      <option value="3" selected>3 жилы</option>
+      <option value="4">4 жилы</option>
+      <option value="5">5 жил</option>
+    </select>
+    <span class="hint">4-5 жил: K<sub>ж</sub> = 0,93 (ГОСТ 31996)</span>
+  </div>
+  <div>
+    <label for="instEnvironment">Среда прокладки</label>
+    <select id="instEnvironment">
+      <option value="air">В воздухе</option>
+      <option value="ground">В земле</option>
+    </select>
+  </div>
+  <div>
+    <label for="instMethod">Способ прокладки</label>
+    <select id="instMethod">
+      <option value="open">Открыто (на стене/тросе/траншея)</option>
+      <option value="trunk">В лотке/коробе (однослойно)</option>
+      <option value="trunk_multi">В лотке/коробе (многослойно/пучком)</option>
+      <option value="tube">В трубе</option>
+    </select>
+  </div>
+  <div>
+    <label for="numCables">Кол-во кабелей в пучке</label>
+    <input type="number" id="numCables" value="1" min="1" max="30">
+  </div>
+  <div>
+    <label for="tempAmbient">Температура среды, °C</label>
+    <input type="number" id="tempAmbient" value="25" min="-30" max="60">
+    <span class="hint" id="tempHint">воздуха (для земли — темп. земли)</span>
+  </div>
+  <div class="ground-only" id="distBlock">
+    <label for="distCables">Расст. между кабелями в земле, мм</label>
+    <select id="distCables">
+      <option value="100">100 мм</option>
+      <option value="200" selected>200 мм</option>
+      <option value="300">300 мм</option>
+    </select>
+    <span class="hint">табл. 1.3.26</span>
+  </div>
+</div>
+<button class="btn" onclick="calculate()">Рассчитать</button>
+</div>
+
+<div class="result" id="result">
+<div class="card">
+<h2>Результат расчёта</h2>
+<div class="result-grid" id="resultGrid"></div>
+</div>
+<div class="card">
+<h2>Ход расчёта</h2>
+<div class="steps" id="steps"></div>
+</div>
+</div>
+
+<div class="card">
+<h2>Таблица 1.3.6 — Медь, пластмассовая/резиновая изоляция (А)</h2>
+<div class="table-wrap"><table id="tableCu"></table></div>
+</div>
+<div class="card">
+<h2>Таблица 1.3.7 — Алюминий, пластмассовая/резиновая изоляция (А)</h2>
+<div class="table-wrap"><table id="tableAl"></table></div>
+</div>
+<div class="card">
+<h2>Таблица 1.3.3 — Поправочные коэффициенты K<sub>t</sub></h2>
+<div class="table-wrap"><table id="tableKt"></table></div>
+</div>
+<div class="card">
+<h2>Таблица 1.3.12 — Коэффициенты прокладки в коробах/лотках</h2>
+<div class="table-wrap"><table id="tableKb"></table></div>
+</div>
+<div class="card">
+<h2>Таблица 1.3.26 — Коэф. совместной прокладки в земле</h2>
+<div class="table-wrap"><table id="tableKg"></table></div>
+</div>
+<p class="ref">Источники: ПУЭ 7 изд. Гл.1.3, ГОСТ Р 50345-2010, ГОСТ 31996-2012</p>
+</div>
+
+<script>
+// ============================================================
+// ТАБЛИЧНЫЕ ДАННЫЕ
+// ============================================================
+
+// Таблица 1.3.6: медь, пластмассовая/резиновая изоляция
+// Столбцы: [сечение, 1-жил.воздух, 2-жил.воздух, 2-жил.земля, 3-жил.воздух, 3-жил.земля]
+const dataCu = [
+  [1.5,  23,  19,  33,  19,  27],
+  [2.5,  30,  27,  44,  25,  38],
+  [4,    41,  38,  55,  35,  49],
+  [6,    50,  50,  70,  42,  60],
+  [10,   80,  70, 105,  55,  90],
+  [16,  100,  90, 135,  75, 115],
+  [25,  140, 115, 175,  95, 150],
+  [35,  170, 140, 210, 120, 180],
+  [50,  215, 175, 265, 145, 225],
+  [70,  270, 215, 320, 180, 275],
+  [95,  325, 260, 385, 220, 330],
+  [120, 385, 300, 445, 260, 385],
+  [150, 440, 350, 505, 305, 435],
+  [185, 510, 405, 570, 350, 500],
+  [240, 605, 480, 650, 410, 590]
+];
+
+// Таблица 1.3.7: алюминий, пластмассовая/резиновая изоляция
+const dataAl = [
+  [2.5,  23,  21,  34,  19,  29],
+  [4,    31,  29,  42,  27,  38],
+  [6,    38,  38,  55,  32,  46],
+  [10,   60,  55,  80,  42,  70],
+  [16,   75,  70, 105,  60,  90],
+  [25,  105,  90, 135,  75, 115],
+  [35,  130, 105, 160,  90, 140],
+  [50,  165, 135, 205, 110, 175],
+  [70,  210, 165, 245, 140, 210],
+  [95,  255, 200, 295, 170, 255],
+  [120, 295, 230, 340, 200, 295],
+  [150, 340, 270, 390, 235, 335],
+  [185, 390, 310, 440, 270, 385],
+  [240, 465, 370, 520, 325, 460]
+];
+
+// Таблица 1.3.3: поправочные коэффициенты Kt
+// Столбцы: температуры от -5 до +50
+// Две группы: воздух (эталон 25°C), земля (эталон 15°C)
+const temps = [-5, 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50];
+const ktData = {
+  air: {
+    90: [1.17,1.14,1.11,1.07,1.04,1.00,0.96,0.92,0.87,0.82,0.76,0.70],
+    80: [1.24,1.20,1.17,1.13,1.09,1.04,1.00,0.95,0.90,0.85,0.80,0.74],
+    70: [1.29,1.24,1.20,1.15,1.11,1.05,1.00,0.94,0.88,0.81,0.74,0.67],
+    65: [1.32,1.27,1.22,1.17,1.12,1.06,1.00,0.94,0.87,0.79,0.71,0.61],
+    60: [1.36,1.31,1.25,1.20,1.13,1.07,1.00,0.93,0.85,0.76,0.66,0.54],
+    55: [1.41,1.35,1.29,1.23,1.15,1.08,1.00,0.91,0.82,0.71,0.58,0.41],
+    50: [1.48,1.41,1.34,1.26,1.18,1.09,1.00,0.89,0.78,0.63,0.45,null]
+  },
+  ground: {
+    90: [1.10,1.07,1.05,1.01,0.98,0.96,0.93,0.89,0.85,0.80,0.75,0.70],
+    80: [1.14,1.11,1.08,1.04,1.00,0.96,0.92,0.88,0.83,0.78,0.73,0.68],
+    65: [1.18,1.14,1.10,1.05,1.00,0.95,0.89,0.84,0.77,0.71,0.63,0.55],
+    60: [1.20,1.15,1.12,1.06,1.00,0.94,0.88,0.82,0.75,0.67,0.57,0.47],
+    55: [1.22,1.17,1.12,1.07,1.00,0.93,0.86,0.79,0.71,0.61,0.50,0.36],
+    50: [1.25,1.20,1.14,1.07,1.00,0.93,0.84,0.76,0.66,0.54,0.37,null]
+  }
+};
+
+// Таблица 1.3.12: снижающие коэффициенты для прокладки в коробах/лотках
+// [koef_dля_Kи_до_0.7, koef_dля_Kи_больше_0.7]
+const kbData = {
+  trunk: {
+    2:[1.0,0.67],3:[0.85,0.6],4:[0.75,0.6],5:[0.7,0.6],
+    6:[0.65,0.6],7:[0.6,0.6],8:[0.6,0.6],9:[0.6,0.6],
+    10:[0.6,0.6],11:[0.6,0.6],12:[0.6,0.6],13:[0.6,0.6],
+    14:[0.6,0.6],15:[0.6,0.6],16:[0.6,0.6],17:[0.6,0.6],18:[0.6,0.6]
+  },
+  trunk_multi: {
+    1:[1.0,1.0],2:[1.0,0.85],3:[1.0,0.75],4:[1.0,0.75],
+    5:[1.0,0.7],6:[1.0,0.7],7:[1.0,0.7],8:[1.0,0.7],
+    9:[1.0,0.7],10:[1.0,0.65],11:[1.0,0.65],12:[1.0,0.65],
+    13:[1.0,0.6],14:[1.0,0.6],15:[1.0,0.6],16:[1.0,0.6],
+    17:[1.0,0.6],18:[1.0,0.6]
+  }
+};
+
+// Таблица 1.3.26: коэффициенты совместной прокладки в земле
+// расстояние_мм: количество_кабелей -> коэффициент
+const kgData = {
+  100:{1:1.00,2:0.90,3:0.85,4:0.80,5:0.78,6:0.75},
+  200:{1:1.00,2:0.92,3:0.87,4:0.84,5:0.82,6:0.81},
+  300:{1:1.00,2:0.93,3:0.90,4:0.87,5:0.86,6:0.85}
+};
+
+// Стандартные номиналы автоматов (ГОСТ Р 50345-2010)
+const breakerRatings = [0.5,1,1.6,2,2.5,3,4,5,6,8,10,13,16,20,25,32,40,50,63,80,100,125,160,200,250,315,400,500,630];
+
+// Коэффициенты допустимой перегрузки (ГОСТ 31996-2012)
+const overloadAir = 1.16;
+const overloadGround = 1.13;
+
+// Коэффициент числа жил (ГОСТ 31996-2012, п.10.9)
+const K_cores_4_5 = 0.93;
+
+// ============================================================
+// ОТРИСОВКА СТАТИЧЕСКИХ ТАБЛИЦ
+// ============================================================
+
+function renderTable136() {
+  const t = document.getElementById('tableCu');
+  let h = '<tr><th>Сечение, мм²</th><th>1-жил. воздух</th><th>2-жил. воздух</th><th>2-жил. земля</th><th>3-жил. воздух</th><th>3-жил. земля</th></tr>';
+  dataCu.forEach(r => {
+    h += '<tr><td><b>'+r[0]+'</b></td>';
+    for(let i=1;i<=5;i++) h+='<td>'+(r[i]!==null?r[i]:'—')+'</td>';
+    h += '</tr>';
+  });
+  t.innerHTML = h;
+}
+
+function renderTable137() {
+  const t = document.getElementById('tableAl');
+  let h = '<tr><th>Сечение, мм²</th><th>1-жил. воздух</th><th>2-жил. воздух</th><th>2-жил. земля</th><th>3-жил. воздух</th><th>3-жил. земля</th></tr>';
+  dataAl.forEach(r => {
+    h += '<tr><td><b>'+r[0]+'</b></td>';
+    for(let i=1;i<=5;i++) h+='<td>'+(r[i]!==null?r[i]:'—')+'</td>';
+    h += '</tr>';
+  });
+  t.innerHTML = h;
+}
+
+function renderTableKt() {
+  const t = document.getElementById('tableKt');
+  let h = '<tr><th>Среда</th><th>Темп., °C</th><th>90°C</th><th>80°C</th><th>70°C</th><th>65°C</th><th>60°C</th><th>55°C</th><th>50°C</th></tr>';
+  [['Воздух (эталон 25°C)','air'],['Земля (эталон 15°C)','ground']].forEach(([name,env]) => {
+    temps.forEach((tmp,i) => {
+      h += '<tr><td>'+(i===0?name:'')+'</td><td><b>'+tmp+'</b></td>';
+      [90,80,70,65,60,55,50].forEach(core => {
+        const v = ktData[env][core] ? ktData[env][core][i] : '—';
+        h += '<td>'+(v!==null?v:'—')+'</td>';
+      });
+      h += '</tr>';
+    });
+  });
+  t.innerHTML = h;
+}
+
+function renderTableKb() {
+  const t = document.getElementById('tableKb');
+  let h = '<tr><th>Способ прокладки</th><th>Кол-во проводов</th><th>K<sub>б</sub> (K<sub>и</sub>≤0,7)</th><th>K<sub>б</sub> (K<sub>и</sub>&gt;0,7)</th></tr>';
+  [['Однослойно','trunk'],['Многослойно/пучками','trunk_multi']].forEach(([name,key]) => {
+    const d = kbData[key];
+    Object.keys(d).forEach(cnt => {
+      h += '<tr><td>'+name+'</td><td>'+cnt+'</td><td>'+d[cnt][0]+'</td><td>'+d[cnt][1]+'</td></tr>';
+    });
+  });
+  t.innerHTML = h;
+}
+
+function renderTableKg() {
+  const t = document.getElementById('tableKg');
+  let h = '<tr><th>Расст., мм</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr>';
+  [100,200,300].forEach(dist => {
+    h += '<tr><td><b>'+dist+'</b></td>';
+    for(let c=1;c<=6;c++) h+='<td>'+kgData[dist][c]+'</td>';
+    h += '</tr>';
+  });
+  t.innerHTML = h;
+}
+
+// ============================================================
+// ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+// ============================================================
+
+// Маппинг типа изоляции -> нормированная температура жилы (°C)
+function getCoreTemp(insulationType) {
+  const map = { pvc: 70, rubber: 65, xlpe: 90 };
+  return map[insulationType] || 70;
+}
+
+// Получение Kt по температуре среды, типу изоляции и среде прокладки
+function getKt(tempAmbient, insulationType, isGround) {
+  const coreTemp = getCoreTemp(insulationType);
+  const env = isGround ? 'ground' : 'air';
+  const data = ktData[env][coreTemp] || ktData[env][80];
+  const idx = temps.indexOf(tempAmbient);
+  if (idx >= 0) return data[idx];
+  // Линейная интерполяция между ближайшими точками
+  let lo = 0, hi = temps.length - 1;
+  for (let i = 0; i < temps.length - 1; i++) {
+    if (tempAmbient >= temps[i] && tempAmbient <= temps[i+1]) { lo = i; hi = i+1; break; }
+  }
+  if (tempAmbient < temps[0]) return data[0] + (tempAmbient - temps[0]) * (data[1] - data[0]) / (temps[1] - temps[0]);
+  if (tempAmbient > temps[temps.length-1]) return data[temps.length-1];
+  const f = (tempAmbient - temps[lo]) / (temps[hi] - temps[lo]);
+  return data[lo] + f * (data[hi] - data[lo]);
+}
+
+// Коэффициент прокладки в коробах/лотках (табл. 1.3.12)
+function getKb(method, numCables, ki) {
+  if (method === 'open' || method === 'tube') return 1.0;
+  const key = method === 'trunk' ? 'trunk' : 'trunk_multi';
+  const d = kbData[key];
+  const n = Math.min(numCables, 18);
+  if (!d[n]) return 0.6;
+  return ki <= 0.7 ? d[n][0] : d[n][1];
+}
+
+// Коэффициент совместной прокладки в земле (табл. 1.3.26)
+function getKg(numCables, distanceMm) {
+  const dist = parseInt(distanceMm) || 200;
+  const n = Math.min(numCables, 6);
+  const d = kgData[dist] || kgData[200];
+  return d[n] || 0.75;
+}
+
+// Получение данных по сечениям из таблиц 1.3.6 / 1.3.7
+// type: 'air_1core', 'air_2core', 'ground_2core', 'air_3core', 'ground_3core'
+function getCableData(material, instEnvironment, numCores) {
+  const data = material === 'cu' ? dataCu : dataAl;
+  // Маппинг: среда + кол-во жил -> столбец таблицы
+  const colKey = instEnvironment + '_' + Math.min(numCores, 3) + 'core';
+  const colMap = {
+    'air_1core': 1, 'air_2core': 2, 'ground_2core': 3,
+    'air_3core': 4, 'ground_3core': 5
+  };
+  const col = colMap[colKey] || 4;
+  return data.map(r => [r[0], r[col]]);
+}
+
+// Ближайший стандартный номинал автомата >= заданного тока
+function findBreaker(nominalCurrent) {
+  for (const r of breakerRatings) {
+    if (r >= nominalCurrent) return r;
+  }
+  return breakerRatings[breakerRatings.length - 1];
+}
+
+// ============================================================
+// ГЛАВНАЯ ФУНКЦИЯ РАСЧЁТА
+// ============================================================
+
+function calculate() {
+  const voltage = parseFloat(document.getElementById('voltage').value) || 380;
+  let iNom = parseFloat(document.getElementById('current').value);
+  const power = parseFloat(document.getElementById('power').value);
+  const cosfi = parseFloat(document.getElementById('cosfi').value) || 0.85;
+  const ki = parseFloat(document.getElementById('ki').value) || 0.8;
+  const material = document.getElementById('material').value;
+  const insulationType = document.getElementById('insulation').value;
+  const numCores = parseInt(document.getElementById('numCores').value) || 3;
+  const instEnvironment = document.getElementById('instEnvironment').value;
+  const instMethod = document.getElementById('instMethod').value;
+  const numCables = parseInt(document.getElementById('numCables').value) || 1;
+  const tempAmbient = parseFloat(document.getElementById('tempAmbient').value) || 25;
+  const distCables = parseInt(document.getElementById('distCables').value) || 200;
+  const isGround = instEnvironment === 'ground';
+
+  // Шаг 1: вычисление номинального тока из мощности (если не введён ток)
+  if (!iNom && power) {
+    iNom = (power * 1000) / (Math.sqrt(3) * voltage * cosfi);
+  }
+  if (!iNom || iNom <= 0) {
+    alert('Введите ток или мощность');
+    return;
+  }
+
+  // Шаг 2: расчётный ток Iр = Iн × Kи
+  const iCalc = iNom * ki;
+
+  const steps = [];
+  const resultGrid = [];
+
+  steps.push({ text: `Номинальный ток: I<sub>н</sub> = ${iNom.toFixed(1)} А`, type: 'info' });
+  steps.push({ text: `Расчётный ток: I<sub>р</sub> = I<sub>н</sub> × K<sub>и</sub> = ${iNom.toFixed(1)} × ${ki} = <b>${iCalc.toFixed(2)} А</b>`, type: 'info' });
+
+  // Шаг 3: коэффициент температуры Kt
+  const coreTemp = getCoreTemp(insulationType);
+  const insNames = { pvc:'ПВХ (70°C)', rubber:'Резина (65°C)', xlpe:'XLPE (90°C)' };
+  const kt = getKt(tempAmbient, insulationType, isGround);
+  steps.push({ text: `Изоляция: ${insNames[insulationType]}, нормир. темп. жилы = ${coreTemp}°C`, type: 'info' });
+  steps.push({ text: `Температура среды: ${tempAmbient}°C (${isGround?'земля':'воздух'})`, type: 'info' });
+  steps.push({ text: `K<sub>t</sub> = ${kt.toFixed(2)} (табл. 1.3.3)`, type: 'info' });
+
+  // Шаг 4: коэффициент прокладки Kb (для воздуха) или Kg (для земли)
+  let kb = 1.0;
+  let kg = 1.0;
+  const methodNames = { open:'открыто/траншея', trunk:'в лотке однослойно', trunk_multi:'в лотке многослойно', tube:'в трубе' };
+  steps.push({ text: `Способ прокладки: ${methodNames[instMethod]}, кабелей: ${numCables}`, type: 'info' });
+
+  if (isGround) {
+    // Для земли: Kb=1 (траншея), Kg по табл. 1.3.26
+    kg = getKg(numCables, distCables);
+    steps.push({ text: `K<sub>б</sub> = 1,00 (кабели в земле — лотки не применяются)`, type: 'info' });
+    steps.push({ text: `K<sub>г</sub> = ${kg.toFixed(2)} (табл. 1.3.26, расст. ${distCables} мм, ${numCables} каб.)`, type: 'info' });
+  } else {
+    kb = getKb(instMethod, numCables, ki);
+    steps.push({ text: `K<sub>б</sub> = ${kb.toFixed(2)} (табл. 1.3.12)`, type: 'info' });
+  }
+
+  // Шаг 5: коэффициент числа жил Kж
+  const kCores = (numCores >= 4) ? K_cores_4_5 : 1.0;
+  if (numCores >= 4) {
+    steps.push({ text: `K<sub>ж</sub> = ${kCores} для ${numCores} жил (ГОСТ 31996-2012)`, type: 'info' });
+  }
+
+  // Общий понижающий коэффициент
+  const kTotal = kt * kb * kg * kCores;
+  steps.push({ text: `Итого коэффициент: K<sub>t</sub>×K<sub>б</sub>×K<sub>г</sub>×K<sub>ж</sub> = ${kt.toFixed(2)}×${kb.toFixed(2)}×${kg.toFixed(2)}×${kCores} = <b>${kTotal.toFixed(3)}</b>`, type: 'info' });
+
+  // Шаг 6: таблица допустимых токов
+  steps.push({ text: `Таблица: ${material==='cu'?'медь (табл. 1.3.6)':'алюминий (табл. 1.3.7)'}`, type: 'info' });
+
+  const cableData = getCableData(material, instEnvironment, numCores);
+
+  // Шаг 7: подбор минимального сечения
+  // Условие: I_д.д × Kt × Kb × Kg × Kж ≥ Iр
+  let foundSection = null;
+  let foundIdx = -1;
+
+  for (let i = 0; i < cableData.length; i++) {
+    const section = cableData[i][0];
+    const idd = cableData[i][1];
+    if (idd === null) continue;
+    const idd_calc = idd * kTotal;
+    if (idd_calc >= iCalc) {
+      foundSection = section;
+      foundIdx = i;
+      steps.push({
+        text: `${section} мм²: I<sub>д.д</sub>=${idd} А → I<sub>д.д.р</sub>=${idd}×${kTotal.toFixed(3)}=<b>${idd_calc.toFixed(1)} А</b> ≥ ${iCalc.toFixed(1)} А ✓`,
+        type: 'pass'
+      });
+      break;
+    } else {
+      steps.push({
+        text: `${section} мм²: I<sub>д.д</sub>=${idd} А → I<sub>д.д.р</sub>=${idd}×${kTotal.toFixed(3)}=${idd_calc.toFixed(1)} А < ${iCalc.toFixed(1)} А — не подходит`,
+        type: 'fail'
+      });
+    }
+  }
+
+  if (!foundSection) {
+    steps.push({ text: '<b>Не найдено подходящее сечение!</b> Требуется кабель большего сечения.', type: 'fail' });
+    showResult(resultGrid, steps);
+    return;
+  }
+
+  const idd = cableData[foundIdx][1];
+  let iddCalc = idd * kTotal;
+
+  // Шаг 8: выбор автомата
+  // Автомат выбирается >= расчётного тока Iр (номинал >= Iр)
+  let breakerNom = findBreaker(iCalc);
+  steps.push({ text: `Автомат: ближайший ≥ I<sub>р</sub> = ${iCalc.toFixed(1)} А → <b>${breakerNom} А</b>`, type: 'info' });
+
+  // Шаг 9: проверка I_авт ≤ I_д.д.р
+  const overloadK = isGround ? overloadGround : overloadAir;
+  let iddOverload = iddCalc * overloadK;
+
+  // Если автомат > I_д.д.р, проверяем по перегрузке, иначе ищем большее сечение
+  if (breakerNom > iddCalc) {
+    if (breakerNom <= iddOverload) {
+      steps.push({ text: `I<sub>авт</sub>=${breakerNom} А > I<sub>д.д.р</sub>=${iddCalc.toFixed(1)} А, но ≤ ${iddOverload.toFixed(1)} А (перегрузка ${overloadK}) — допустимо`, type: 'pass' });
+    } else {
+      steps.push({ text: `I<sub>авт</sub>=${breakerNom} А > I<sub>д.д.р</sub>=${iddCalc.toFixed(1)} А и > перегрузки ${iddOverload.toFixed(1)} А — ищем большее сечение`, type: 'fail' });
+      for (let i = foundIdx + 1; i < cableData.length; i++) {
+        const section = cableData[i][0];
+        const idd2 = cableData[i][1];
+        if (idd2 === null) continue;
+        const idd2_calc = idd2 * kTotal;
+        const idd2_overload = idd2_calc * overloadK;
+        steps.push({
+          text: `Проверка ${section} мм²: I<sub>д.д.р</sub>=${idd2_calc.toFixed(1)} А, перегрузка=${idd2_overload.toFixed(1)} А`,
+          type: (idd2_calc >= iCalc && breakerNom <= idd2_overload) ? 'pass' : 'fail'
+        });
+        if (idd2_calc >= iCalc && breakerNom <= idd2_overload) {
+          foundSection = section;
+          foundIdx = i;
+          iddCalc = idd2_calc;
+          iddOverload = idd2_overload;
+          break;
+        }
+      }
+    }
+  }
+
+  // Финальная проверка: Iр ≤ I_д.д.р
+  const checkOk = iCalc <= iddCalc;
+  steps.push({
+    text: `Проверка: I<sub>р</sub>=${iCalc.toFixed(1)} А ≤ I<sub>д.д.р</sub>=${iddCalc.toFixed(1)} А — ${checkOk ? '<span class="ok-text">✓</span>' : '<span class="warn-text">✗</span>'}`,
+    type: checkOk ? 'pass' : 'fail'
+  });
+
+  // Шаг 10: проверка I_авт ≤ I_д.д.р
+  const checkBreaker = breakerNom <= iddCalc;
+  steps.push({
+    text: `Проверка: I<sub>авт</sub>=${breakerNom} А ≤ I<sub>д.д.р</sub>=${iddCalc.toFixed(1)} А — ${checkBreaker ? '<span class="ok-text">✓</span>' : '<span class="warn-text">✗</span>'}`,
+    type: checkBreaker ? 'pass' : 'fail'
+  });
+
+  // Итоговые карточки
+  const matName = material === 'cu' ? 'Медь' : 'Алюминий';
+  const envName = isGround ? 'земля' : 'воздух';
+
+  resultGrid.push({ label: 'Сечение кабеля', value: foundSection + ' мм²', type: checkOk ? 'ok' : 'warn' });
+  resultGrid.push({ label: 'Автомат', value: breakerNom + ' А', type: 'ok' });
+  resultGrid.push({ label: 'I<sub>н</sub>', value: iNom.toFixed(1) + ' А', type: 'info' });
+  resultGrid.push({ label: 'I<sub>р</sub> = I<sub>н</sub>×K<sub>и</sub>', value: iCalc.toFixed(1) + ' А', type: 'info' });
+  resultGrid.push({ label: 'I<sub>д.д</sub> (табл.)', value: idd + ' А', type: 'info' });
+  resultGrid.push({ label: 'I<sub>д.д.р</sub> (рассч.)', value: iddCalc.toFixed(1) + ' А', type: checkOk ? 'ok' : 'warn' });
+  resultGrid.push({ label: 'K<sub>t</sub>', value: kt.toFixed(2), type: 'info' });
+  resultGrid.push({ label: 'K<sub>б</sub>', value: kb.toFixed(2), type: 'info' });
+  if (isGround) resultGrid.push({ label: 'K<sub>г</sub>', value: kg.toFixed(2), type: 'info' });
+  if (numCores >= 4) resultGrid.push({ label: 'K<sub>ж</sub>', value: kCores.toFixed(2), type: 'info' });
+  resultGrid.push({ label: 'Перегрузка (ГОСТ)', value: iddOverload.toFixed(1) + ' А (' + overloadK + ')', type: 'info' });
+
+  steps.push({ text: `<b>Итого: ${matName}, ${numCores}-жил., ${envName}, ${foundSection} мм², ${breakerNom} А</b>`, type: checkOk ? 'pass' : 'fail' });
+
+  showResult(resultGrid, steps);
+}
+
+function showResult(grid, steps) {
+  const el = document.getElementById('result');
+  el.classList.add('show');
+  document.getElementById('resultGrid').innerHTML = grid.map(g =>
+    `<div class="result-item ${g.type==='ok'?'ok':g.type==='warn'?'warn':''}">
+      <div class="label">${g.label}</div>
+      <div class="value ${g.type==='ok'?'ok-text':g.type==='warn'?'warn-text':''}">${g.value}</div>
+    </div>`
+  ).join('');
+  document.getElementById('steps').innerHTML = steps.map(s =>
+    `<div class="step ${s.type==='pass'?'pass':s.type==='fail'?'fail':''}">${s.text}</div>`
+  ).join('');
+  el.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+// ============================================================
+// UI: показ/скрытие полей для земли
+// ============================================================
+document.getElementById('instEnvironment').addEventListener('change', function() {
+  const isGnd = this.value === 'ground';
+  document.getElementById('distBlock').classList.toggle('show', isGnd);
+  document.getElementById('tempHint').textContent = isGnd ? 'земли (для воздуха — темп. воздуха)' : 'воздуха (для земли — темп. земли)';
+});
+
+// ============================================================
+// ИНИЦИАЛИЗАЦИЯ
+// ============================================================
+renderTable136();
+renderTable137();
+renderTableKt();
+renderTableKb();
+renderTableKg();
+</script>
+</body>
+</html>
